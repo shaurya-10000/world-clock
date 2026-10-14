@@ -1,0 +1,50 @@
+{
+  "compilerOptions": {
+    /* Emit target — Next.js transpiles the rest. */
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+
+    /* Type checking. */
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "allowJs": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+
+    /* Module resolution — Next.js 16 defaults to bundler. */
+    "module": "esnext",
+    "moduleResolution": "bundler",
+
+    /* JSX transform — React 19 uses the automatic runtime. */
+    "jsx": "react-jsx",
+
+    /* Vitest globals (`describe`, `it`, `expect`, `vi`)
+       are ambient, so test files don't have to import them. */
+    "types": ["vitest/globals"],
+
+    /* Incremental compilation — speeds up repeated `tsc`
+       invocations and the Next.js build. */
+    "incremental": true,
+
+    /* Next.js type plugin. Regenerates route types from the
+       App Router tree so `Metadata`, `MetadataRoute`, and
+       route params are typed. */
+    "plugins": [{ "name": "next" }],
+
+    /* Path alias — every import from `@/` resolves to `src/`. */
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts",
+    "**/*.mts"
+  ],
+  "exclude": ["node_modules"]
+}

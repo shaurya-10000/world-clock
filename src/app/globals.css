@@ -1,0 +1,274 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   Design tokens
+   ========================================================================== */
+
+:root {
+  /* Base palette — dark by default. */
+  --background: #05070a;
+  --foreground: #f5f7f8;
+
+  /* Surfaces — layered cards and drawers. */
+  --surface: rgba(255, 255, 255, 0.025);
+  --surface-strong: rgba(12, 14, 18, 0.92);
+
+  /* Text hierarchy. */
+  --muted: rgba(245, 247, 248, 0.62);
+  --subtle: rgba(245, 247, 248, 0.38);
+
+  /* Borders. */
+  --border: rgba(255, 255, 255, 0.09);
+
+  /* Accent — the gold used on selected states throughout. */
+  --accent: #c5a059;
+  --accent-glow: rgba(197, 160, 89, 0.45);
+
+  /* Favorite — the pink used on the heart toggle. */
+  --favorite: #ff4d8d;
+  --favorite-glow: rgba(255, 77, 141, 0.45);
+
+  /* Live indicator — used on the "live" dot in the header. */
+  --live: rgb(52, 211, 153);
+
+  /* Sun glow — used by the globe's ambient atmosphere layer. */
+  --sun-glow-core: rgba(255, 215, 150, 0.22);
+  --sun-glow-mid: rgba(255, 180, 100, 0.1);
+  --sun-glow-edge: rgba(255, 140, 80, 0.04);
+
+  /*
+   * Radius scale. Referenced by Tailwind utilities via
+   * `rounded-[var(--radius-lg)]` where the built-in scale is
+   * not granular enough.
+   */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.5rem;
+  --radius-3xl: 2rem;
+  --radius-4xl: 2.25rem;
+
+  /*
+   * Font families. Set by `next/font` on the <html> element;
+   * these are fallbacks used before the fonts load and by
+   * anything rendered outside the layout tree.
+   */
+  --font-sans:
+    var(--font-inter), ui-sans-serif, system-ui,
+    -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
+  --font-mono:
+    var(--font-jetbrains-mono), ui-monospace,
+    "SFMono-Regular", "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  --font-display:
+    var(--font-fraunces), "Iowan Old Style",
+    "Apple Garamond", Baskerville, "Times New Roman",
+    Times, "Droid Serif", serif;
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  background: var(--background);
+  color-scheme: dark;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/*
+ * Tailwind's `font-serif` and `font-mono` utilities are
+ * overridden to use our design tokens. Anywhere the codebase
+ * writes `font-serif`, it gets Fraunces; anywhere it writes
+ * `font-mono`, it gets JetBrains Mono.
+ */
+.font-serif {
+  font-family: var(--font-display);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* ==========================================================================
+   Interactive elements
+   ========================================================================== */
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+}
+
+/* ==========================================================================
+   Scrollbar (WebKit)
+   ========================================================================== */
+
+html::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+html::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+html::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+html::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
+  background-clip: content-box;
+}
+
+/* ==========================================================================
+   Reduced motion
+   ========================================================================== */
+
+/*
+ * Every animation and transition is collapsed to 0.01ms for
+ * users who request reduced motion. This intentionally also
+ * disables the pulse on the loading fallback's gold dot — for
+ * those users it becomes a static indicator, which is the
+ * correct accessibility behaviour, not a regression.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ==========================================================================
+   Focus visibility
+   ========================================================================== */
+
+/*
+ * The fallback focus outline applies only to buttons and
+ * links. Text inputs, textareas, and selects are excluded
+ * because:
+ *
+ *   1. They receive focus on page load or on user action in
+ *      ways that are not always "keyboard navigation," so a
+ *      gold outline on them is visual noise rather than a
+ *      helpful affordance.
+ *
+ *   2. Every input in this app is wrapped in a container
+ *      whose `focus-within:` styles already provide a clear
+ *      focus indicator (a brightened border). The fallback
+ *      outline was doubling up on that.
+ *
+ * Elements that explicitly declare their own
+ * `focus-visible:ring-*` utility suppress the outline
+ * entirely, since the ring is the indicator.
+ */
+
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+[class*="focus-visible:ring"]:focus-visible {
+  outline: none;
+}
+
+/* ==========================================================================
+   Forced colors (Windows High Contrast Mode)
+   ========================================================================== */
+
+/*
+ * Attribute selectors match against the rendered class string.
+ * Tailwind v4 does not promise those strings are stable across
+ * versions; if a future upgrade changes how a utility is
+ * emitted, these overrides may stop matching. They are
+ * best-effort. The `:focus-visible` rule at the bottom of this
+ * block is the one that matters most and does not depend on
+ * any emitted class name.
+ */
+@media (forced-colors: active) {
+  /*
+   * Tailwind v4 emits token utilities in parenthesis form,
+   * e.g. `border-(--border)` and `text-(--muted)`. The
+   * selectors below match that form. Earlier revisions of
+   * this file used the bracket form `[var(--token)]`, which
+   * never matched a rendered class — those were dead rules.
+   */
+  [class*="border-(--border)"],
+  [class*="border-white/"] {
+    border-color: CanvasText;
+  }
+
+  [class*="bg-(--surface)"],
+  [class*="bg-white/"],
+  [class*="bg-black/"] {
+    border: 1px solid CanvasText;
+    background: Canvas;
+  }
+
+  [class*="text-(--muted)"],
+  [class*="text-(--subtle)"],
+  [class*="text-white/"] {
+    color: CanvasText;
+  }
+
+  [aria-selected="true"],
+  [aria-pressed="true"] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+
+  /*
+   * In forced-colors mode the fallback applies to every
+   * focusable element, including inputs — the accessibility
+   * benefit outweighs the visual noise there.
+   */
+  :focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+
+  /*
+   * Decorative layers that must not appear in high-contrast
+   * mode: fixed overlays and blurred glows both fight the
+   * system palette. `[class*="blur-"]` catches Tailwind's
+   * blur utilities; `[class*="fixed"]` catches fixed
+   * positioning on decorative elements only.
+   */
+  [aria-hidden="true"][class*="fixed"],
+  [aria-hidden="true"][class*="blur-"] {
+    display: none;
+  }
+}
