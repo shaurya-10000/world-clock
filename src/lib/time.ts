@@ -30,6 +30,25 @@
  * ICU data, unusual environment behavior — visible in logs
  * without spamming on the hot path when the same zone fails
  * on every tick.
+ *
+ * ## ICU variance
+ *
+ * `Intl` output is not byte-identical across ICU builds. Two
+ * specific differences matter here:
+ *
+ *   1. Midnight under `hour12: false` renders as `"24:00"` on
+ *      some builds (Ubuntu's, notably) and `"00:00"` on
+ *      others (Windows, macOS). `formatTime24` normalizes to
+ *      `"00:00"`.
+ *
+ *   2. The zero-offset time zone name renders as `"GMT"` on
+ *      some builds, `"UTC"` on others, and `"UTC+00:00"` or
+ *      `"GMT+00:00"` on yet others. `getUtcOffset` collapses
+ *      every variant to `"UTC"`.
+ *
+ * Both normalizations exist so the same code produces the
+ * same output on every platform. Without them, tests pass on
+ * the developer's machine and fail in CI.
  */
 
 /* -------------------------------------------------------------------------- */
@@ -313,8 +332,25 @@ export function formatTime12(date: Date, timeZone: string): string {
   return getFormatter(timeZone, "hm12").format(date);
 }
 
+/**
+ * 24-hour time string, with midnight normalized to `"00:00"`.
+ *
+ * ## Why the replacement
+ *
+ * Some ICU builds render midnight under `hour12: false` as
+ * `"24:00"` rather than `"00:00"`. Ubuntu's Node distribution
+ * is one such build; Windows' is not. The difference shows up
+ * as a test failure on CI that passes locally, which is worse
+ * than a straight bug because it looks like flakiness.
+ *
+ * The `^24:` anchor means the substitution only fires when
+ * `24` is followed by a colon at the start of the string. A
+ * value like `"12:24"` is left alone — its `24` is in the
+ * minutes position, not the hours.
+ */
 export function formatTime24(date: Date, timeZone: string): string {
-  return getFormatter(timeZone, "hm24").format(date);
+  const formatted = getFormatter(timeZone, "hm24").format(date);
+  return formatted.replace(/^24:/, "00:");
 }
 
 export function formatTime12WithSeconds(
@@ -328,7 +364,8 @@ export function formatTime24WithSeconds(
   date: Date,
   timeZone: string,
 ): string {
-  return getFormatter(timeZone, "hms24").format(date);
+  const formatted = getFormatter(timeZone, "hms24").format(date);
+  return formatted.replace(/^24:/, "00:");
 }
 
 export function formatSeconds(
@@ -484,12 +521,35 @@ export function getTimeZoneAbbreviation(
 }
 
 /**
- * UTC offset string (e.g. "UTC-04:00", "UTC").
+ * UTC offset string (e.g. `"UTC-04:00"`, `"UTC"`).
  *
- * `Intl` renders the `longOffset` time-zone name with a `GMT`
- * prefix. We rewrite it to `UTC` for consistency with the rest
- * of the app — anchored at the start of the string so a
- * hypothetical mid-string `GMT` is left alone.
+ * ## Why the output is not passed through verbatim
+ *
+ * `Intl` renders the `longOffset` time-zone name in one of
+ * several shapes depending on the ICU build:
+ *
+ *   - `"GMT"` — some Linux builds, for the zero offset.
+ *   - `"UTC"` — some builds, for the zero offset.
+ *   - `"GMT+00:00"` — most builds, for the zero offset.
+ *   - `"UTC+00:00"` — Ubuntu's build, for the zero offset.
+ *   - `"GMT-05:00"` — most builds, for a non-zero offset.
+ *   - `"UTC-05:00"` — Ubuntu's build, for a non-zero offset.
+ *
+ * The rest of the app calls the zero offset `"UTC"` and every
+ * other offset `"UTC±HH:MM"`. The two normalizations below
+ * collapse every input shape to one of those two forms.
+ *
+ * ## Zero offset
+ *
+ * `"UTC+00:00"` and `"UTC-00:00"` are both semantically the
+ * zero offset. Neither sign carries information. Both are
+ * collapsed to `"UTC"`.
+ *
+ * ## Non-zero offsets
+ *
+ * The `GMT` prefix (if present) is rewritten to `UTC`. The
+ * offset value itself — sign, hours, minutes — is left
+ * untouched.
  */
 export function getUtcOffset(
   date: Date,
@@ -511,11 +571,22 @@ export function getUtcOffset(
     const raw =
       parts.find((part) => part.type === "timeZoneName")?.value ?? "";
 
-    if (raw.length === 0 || raw === "GMT") {
+    if (raw.length === 0) {
       return "UTC";
     }
 
-    return raw.replace(/^GMT/, "UTC");
+    /* Normalize the `GMT` prefix to `UTC`. */
+    const withUtcPrefix = raw.replace(/^(GMT|UTC)/, "UTC");
+
+    /* Collapse the zero offset, with either sign, to `UTC`. */
+    if (
+      withUtcPrefix === "UTC+00:00" ||
+      withUtcPrefix === "UTC-00:00"
+    ) {
+      return "UTC";
+    }
+
+    return withUtcPrefix;
   } catch {
     reportFailure("format-failed", normalized);
     return "UTC";
