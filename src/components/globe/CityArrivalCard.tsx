@@ -2,7 +2,7 @@
 
 import { Html } from "@react-three/drei";
 import { ExternalLink, X } from "lucide-react";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 
 import {
   getAtmosphere,
@@ -17,7 +17,10 @@ import {
   formatTime12WithSeconds,
   getDecimalHour,
 } from "@/lib/time";
+import { useFavorites } from "@/lib/useFavorites";
 import { useNow } from "@/lib/useNow";
+
+import { FavoriteButton } from "@/components/CitiesSection";
 
 import CityFactsSection, {
   CARD_SECTION_CAPTION_CLASS,
@@ -84,30 +87,6 @@ export function buildMapsUrl(location: WorldLocation): string {
 /* Card chrome                                                                */
 /* -------------------------------------------------------------------------- */
 
-/**
- * Per-atmosphere chrome for the card.
- *
- * The card renders a miniature version of the atmosphere's
- * visual: the same sky gradient, the same ambient radial
- * washes, the same accent color, and a small star field when
- * the atmosphere shows stars. The whole thing is heavily
- * dimmed so it reads as a soft tinted backdrop rather than
- * competing with the time and coordinates for attention.
- *
- * ## Why not render the full `SkyAtmosphere` component
- *
- * `SkyAtmosphere` assumes a wide, tall container — its sun is
- * 88–116px wide, its clouds are 230–380px wide, and its arc
- * positions are percentages of a large section. In a 210–280px
- * card, the sun would be half the card's width and the clouds
- * would clip to slivers. This component reproduces only the
- * parts that scale: the gradient, the ambient washes, and a
- * small hand-tuned star field.
- *
- * The sun/moon arcs are omitted on purpose. They would dominate
- * the card's layout and fight the time digits. The card is a
- * window into the atmosphere's *mood*, not a full scene.
- */
 interface CardChrome {
   readonly gradientOpacity: number;
   readonly ambientOpacity: number;
@@ -162,13 +141,6 @@ const CARD_CHROME: Record<Atmosphere, CardChrome> = {
   },
 };
 
-/**
- * The card's star positions, as percentages.
- *
- * Ten entries — one per possible star slot. The card only
- * renders the first `starCount` slots, so `day` (starCount 0)
- * shows none and `night` (starCount 10) shows all ten.
- */
 const CARD_STARS: readonly {
   readonly left: number;
   readonly top: number;
@@ -187,15 +159,6 @@ const CARD_STARS: readonly {
   { left: 44, top: 40, size: 1.0, delay: 1.4 },
 ];
 
-/**
- * The card's star field keyframes.
- *
- * Inlined in a `<style>` tag rather than added to
- * `globals.css` because the animation is used by exactly one
- * component. The name is prefixed with `card-` to avoid
- * colliding with any other `*-twinkle` keyframe that might be
- * introduced by a dependency or a sibling component.
- */
 const STAR_KEYFRAMES = `
   @keyframes card-star-twinkle {
     0%, 100% { opacity: 0.35; }
@@ -212,17 +175,6 @@ interface StarLayerProps {
   readonly peakOpacity: number;
 }
 
-/**
- * The card's twinkling star field.
- *
- * Renders the first `count` entries of `CARD_STARS` as small
- * animated dots. The animation is a simple opacity pulse; the
- * per-star `delay` phases the twinkle so the field does not
- * pulse in unison.
- *
- * Renders `null` when `count` is `0` — the `day` atmosphere
- * has no stars.
- */
 function StarLayer({ count, peakOpacity }: StarLayerProps) {
   if (count === 0) return null;
 
@@ -257,52 +209,26 @@ function StarLayer({ count, peakOpacity }: StarLayerProps) {
 /* Component                                                                  */
 /* -------------------------------------------------------------------------- */
 
-/**
- * The "you have arrived" card.
- *
- * Appears when the camera has zoomed close enough to the
- * selected location that the user is clearly focused on that
- * city rather than browsing the globe. The card gives the
- * user three things the globe itself cannot:
- *
- *   1. The city's current local time, updated every second.
- *   2. The city's full name in text, unambiguous.
- *   3. A direct link to the location in Google Maps.
- *
- * ## Visibility is owned by the parent
- *
- * This component renders exactly when it is mounted. The
- * parent (`GlobeScene`) is the single owner of the "should
- * the card be visible?" decision. The card has no internal
- * visibility state.
- *
- * ## The `nowMs === null` case
- *
- * On the very first client render — before the ticker's
- * effect has run — `useNow(1000)` returns `null`. The card
- * renders its placeholder state:
- *
- *   - The time string is `"—:—:—"`.
- *   - The date string is empty.
- *   - The atmosphere falls back to `"day"`.
- *
- * `"day"` is the deliberate choice for the fallback
- * atmosphere because it has the *least visual weight* in
- * `CARD_CHROME`: zero stars, a mild gradient, and a
- * low-opacity ambient.
- *
- * Do not replace the placeholder with a live-time fallback
- * (`new Date()`). The card is server-rendered on the initial
- * render, and a wall-clock read on the server would not match
- * the client's first paint — a hydration mismatch. The
- * placeholder is what keeps the SSR and CSR output identical.
- */
 export default function CityArrivalCard({
   location,
   onClose,
   cardSide = "right",
 }: CityArrivalCardProps) {
   const nowMs = useNow(1000);
+
+  /*
+   * The card subscribes to the shared favorites store so
+   * toggling the heart updates the button in place, and so a
+   * toggle made anywhere else in the app (the drawer's heart,
+   * another tab) is reflected on the next render.
+   */
+  const { isFavorite, toggle } = useFavorites();
+
+  const favorited = isFavorite(location.id);
+
+  const handleToggleFavorite = useCallback(() => {
+    toggle(location.id);
+  }, [toggle, location.id]);
 
   const atmosphere = useMemo<Atmosphere>(() => {
     if (nowMs === null) return "day";
@@ -459,39 +385,46 @@ export default function CityArrivalCard({
                 </p>
               </div>
 
-              <button
-                type="button"
-                aria-label={`Close ${location.city} detail card`}
-                title="Close"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onClose();
-                }}
-                className="
-                  -mt-0.5
-                  flex
-                  size-5
-                  shrink-0
-                  items-center
-                  justify-center
-                  rounded-full
-                  text-[var(--muted)]
-                  transition-colors
-                  duration-200
-                  hover:bg-[var(--foreground)]/[0.06]
-                  hover:text-[var(--foreground)]
-                  focus-visible:outline-none
-                  focus-visible:ring-2
-                  focus-visible:ring-[var(--foreground)]/25
-                  sm:size-6
-                "
-              >
-                <X
-                  aria-hidden="true"
-                  className="size-3 sm:size-3.5"
-                  strokeWidth={1.7}
+              <div className="-mt-0.5 flex shrink-0 items-center gap-0.5">
+                <FavoriteButton
+                  active={favorited}
+                  city={location.city}
+                  onToggle={handleToggleFavorite}
                 />
-              </button>
+
+                <button
+                  type="button"
+                  aria-label={`Close ${location.city} detail card`}
+                  title="Close"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onClose();
+                  }}
+                  className="
+                    flex
+                    size-5
+                    shrink-0
+                    items-center
+                    justify-center
+                    rounded-full
+                    text-[var(--muted)]
+                    transition-colors
+                    duration-200
+                    hover:bg-[var(--foreground)]/[0.06]
+                    hover:text-[var(--foreground)]
+                    focus-visible:outline-none
+                    focus-visible:ring-2
+                    focus-visible:ring-[var(--foreground)]/25
+                    sm:size-6
+                  "
+                >
+                  <X
+                    aria-hidden="true"
+                    className="size-3 sm:size-3.5"
+                    strokeWidth={1.7}
+                  />
+                </button>
+              </div>
             </div>
 
             {/* Local time */}

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import {
   afterEach,
   beforeEach,
@@ -71,12 +71,14 @@ function renderCard(location: WorldLocation) {
 beforeEach(() => {
   resetUseNow();
   resetTimeCache();
+  window.localStorage.clear();
   installFixedClock(Date.UTC(2024, 0, 15, 12, 0, 0));
 });
 
 afterEach(() => {
   resetUseNow();
   vi.restoreAllMocks();
+  window.localStorage.clear();
 });
 
 /* -------------------------------------------------------------------------- */
@@ -263,10 +265,82 @@ describe("CityArrivalCard — close flow", () => {
       name: /Close Tokyo detail card/,
     });
 
-    closeButton.click();
+    fireEvent.click(closeButton);
 
     expect(secondClose).toHaveBeenCalledTimes(1);
     expect(firstClose).not.toHaveBeenCalled();
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Favorite toggle                                                            */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * ## Why this block exists
+ *
+ * The heart button on the arrival card was added after the
+ * card shipped. The existing `CitiesSection` tests cover the
+ * `FavoriteButton` component itself — its accessible name,
+ * its `aria-pressed` state, and the toggle behavior in the
+ * drawer. What those tests do *not* cover is the card's *use*
+ * of the button:
+ *
+ *   1. That the heart is rendered on the card at all.
+ *
+ *   2. That clicking the heart does not trigger the card's
+ *      `onClose` handler.
+ *
+ *   3. That toggling the heart writes to `localStorage` via
+ *      the card's `handleToggleFavorite` wrapper.
+ *
+ * These three tests are deliberately narrow. They do not
+ * re-assert the button's own contract — that lives in
+ * `CitiesSection.component.test.tsx`.
+ */
+
+describe("CityArrivalCard — favorite toggle", () => {
+  it("renders a heart button with an 'Add to favorites' accessible name when not favorited", () => {
+    renderCard(TOKYO);
+
+    expect(
+      screen.getByRole("button", {
+        name: "Add Tokyo to favorites",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("does not call onClose when the heart is clicked", () => {
+    const onClose = vi.fn();
+
+    render(<CityArrivalCard location={TOKYO} onClose={onClose} />);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Add Tokyo to favorites",
+      }),
+    );
+
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("writes the toggled favorite to localStorage when the heart is clicked", () => {
+    renderCard(TOKYO);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Add Tokyo to favorites",
+      }),
+    );
+
+    const stored = window.localStorage.getItem(
+      "world-clock:favorites",
+    );
+    expect(stored).not.toBeNull();
+    expect(JSON.parse(stored as string)).toEqual({
+      v: 1,
+      ids: ["tokyo"],
+    });
   });
 });
 

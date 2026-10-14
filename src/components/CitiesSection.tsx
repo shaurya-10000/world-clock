@@ -126,7 +126,31 @@ interface FavoriteButtonProps {
   readonly onToggle: () => void;
 }
 
-function FavoriteButton({
+/**
+ * The heart-shaped favorite toggle button.
+ *
+ * Defined here because the drawer is where it was first used
+ * and where the styling conventions live — but **exported**
+ * because `CityArrivalCard.tsx` needs the same button, and
+ * duplicating 40 lines of interactive markup with an ARIA
+ * contract is worse than importing from a sibling.
+ *
+ * If a third consumer ever appears, this is the moment to move
+ * the component into its own file. Two consumers is not.
+ *
+ * ## Click contract
+ *
+ * `onClick` calls `event.stopPropagation()` **before** invoking
+ * `onToggle`. In the drawer this prevents the click from also
+ * triggering the full-cover "Select {city}" button underneath.
+ * In the arrival card it prevents the click from reaching the
+ * globe's pointer handlers, which would start a drag.
+ *
+ * The order matters: stop first, then act. Reversing it would
+ * let the toggle run while the outer button's click handler
+ * also fires, producing two toggles and a desynced `aria-pressed`.
+ */
+export function FavoriteButton({
   active,
   city,
   onToggle,

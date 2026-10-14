@@ -34,30 +34,45 @@
  *     store: rejected by `toggle` so the in-memory list stays
  *     consistent with the catalog.
  *
+ * ## Shared state within a tab
+ *
+ * Every `useFavorites()` caller in the tab reads from one
+ * module-level store, subscribed to through
+ * `useSyncExternalStore`. A toggle made through any caller (the
+ * Cities drawer heart button, say) updates the store, persists
+ * to `localStorage`, and notifies every subscriber (the globe
+ * markers, say) in the same tick.
+ *
+ * This replaces an earlier design in which each caller held a
+ * private `useState` copy. Those copies never saw each other's
+ * writes — the browser does not fire `storage` events in the
+ * tab that performed the write — so favoriting a city in the
+ * drawer left the globe markers gray until a reload.
+ *
  * ## Cross-tab behavior
  *
- * The hook listens for `storage` events so that toggling a
- * favorite in one tab is reflected in another tab within the
- * same browser.
+ * While at least one component is subscribed, a single `storage`
+ * listener is attached to `window`. It re-reads the persisted
+ * list when another tab changes (or clears) the favorites key,
+ * then notifies the local subscribers. When the last subscriber
+ * unmounts the listener is removed and the cached snapshot is
+ * dropped, so the next subscriber starts from a fresh read.
  *
  * ## SSR / hydration
  *
- * The initial read happens in a `useState` initializer guarded
- * on `typeof window === "undefined"`. On the server, the
- * initializer returns `EMPTY_FAVORITES`; on the client, it
- * returns the persisted list before the first paint. This
- * eliminates the one-frame flash where a user with favorites
- * would see an empty list before the real list appeared.
- *
- * The mismatch this produces is handled by the root `<html>`
- * element's `suppressHydrationWarning` (see `app/layout.tsx`).
+ * On the server, and for the hydration render on the client,
+ * React uses `getServerSnapshot`, which returns
+ * `EMPTY_FAVORITES`. Immediately after hydration React switches
+ * to `getSnapshot`, which reads the persisted list. The
+ * server-rendered HTML and the hydration render therefore
+ * always agree; the persisted list arrives on the very next
+ * commit rather than being baked into the first client render.
  */
 
 import {
   useCallback,
-  useEffect,
   useMemo,
-  useState,
+  useSyncExternalStore,
 } from "react";
 
 import { WORLD_LOCATIONS } from "@/lib/locations";
@@ -242,6 +257,111 @@ function writeFavorites(ids: readonly string[]): void {
 }
 
 /* -------------------------------------------------------------------------- */
+/* Shared store                                                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Subscribers registered through `useSyncExternalStore`. One
+ * entry per mounted `useFavorites()` caller.
+ */
+const listeners = new Set<() => void>();
+
+/**
+ * The cached current list, or `null` when it has not been read
+ * from storage yet (or was dropped because the last subscriber
+ * unmounted).
+ *
+ * `useSyncExternalStore` requires `getSnapshot` to return the
+ * same reference until the data actually changes, so the list
+ * is read once and cached here rather than re-read per call.
+ */
+let snapshot: readonly string[] | null = null;
+
+/** Notify every subscriber that the snapshot changed. */
+function emit(): void {
+  listeners.forEach((listener) => listener());
+}
+
+function getSnapshot(): readonly string[] {
+  if (snapshot === null) {
+    snapshot = readFavorites();
+  }
+
+  return snapshot;
+}
+
+/**
+ * Used on the server and for the client's hydration render.
+ * Always empty, so the first client render matches the server
+ * HTML exactly.
+ */
+function getServerSnapshot(): readonly string[] {
+  return EMPTY_FAVORITES;
+}
+
+/**
+ * Cross-tab sync. Attached once while at least one subscriber
+ * is mounted.
+ */
+function handleStorage(event: StorageEvent): void {
+  /*
+   * `event.storageArea` is the `Storage` object the event
+   * originated from. The spec says it is always populated
+   * when the event is dispatched by the browser. Manually
+   * constructed `StorageEvent`s — as in tests, and as in
+   * some polyfills — leave it `null` unless the caller
+   * passes it explicitly.
+   *
+   * Both `window.localStorage` and `null` are therefore
+   * accepted as "this event is for us". Anything else is
+   * filtered out, which is what excludes `sessionStorage`
+   * and other origins.
+   */
+  if (
+    event.storageArea !== null &&
+    event.storageArea !== window.localStorage
+  ) {
+    return;
+  }
+
+  /*
+   * `event.key` is `null` for `localStorage.clear()`. A
+   * clear that affects our key (or the whole store)
+   * re-reads from an empty store, which produces
+   * `EMPTY_FAVORITES`.
+   */
+  if (event.key !== null && event.key !== STORAGE_KEY) {
+    return;
+  }
+
+  snapshot = readFavorites();
+  emit();
+}
+
+function subscribe(listener: () => void): () => void {
+  if (listeners.size === 0) {
+    window.addEventListener("storage", handleStorage);
+  }
+
+  listeners.add(listener);
+
+  return () => {
+    listeners.delete(listener);
+
+    if (listeners.size === 0) {
+      window.removeEventListener("storage", handleStorage);
+
+      /*
+       * Nobody is listening, so nothing keeps the cache in
+       * sync with storage. Drop it; the next subscriber
+       * re-reads.
+       */
+      snapshot = null;
+    }
+  };
+}
+
+/* -------------------------------------------------------------------------- */
 /* Hook                                                                       */
 /* -------------------------------------------------------------------------- */
 
@@ -266,62 +386,24 @@ export interface FavoritesApi {
    * renders. IDs not present in the catalog are ignored — the
    * hook state never contains an ID that
    * `getWorldLocationById` would not resolve.
+   *
+   * The change is visible to every `useFavorites()` caller in
+   * the tab, not just the one that called `toggle`.
    */
   readonly toggle: (locationId: string) => void;
 }
 
 export function useFavorites(): FavoritesApi {
   /*
-   * Synchronous initial read. See the module header for why
-   * this is a `useState` initializer rather than a `null`
-   * state populated in an effect.
+   * Shared, not per-instance. See the "Shared state within a
+   * tab" section of the module header for why this is a
+   * module-level store rather than a `useState`.
    */
-  const [ids, setIds] = useState<readonly string[]>(
-    readFavorites,
+  const ids = useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    getServerSnapshot,
   );
-
-  /* Cross-tab sync. */
-  useEffect(() => {
-    const handleStorage = (event: StorageEvent): void => {
-      /*
-       * `event.storageArea` is the `Storage` object the event
-       * originated from. The spec says it is always populated
-       * when the event is dispatched by the browser. Manually
-       * constructed `StorageEvent`s — as in tests, and as in
-       * some polyfills — leave it `null` unless the caller
-       * passes it explicitly.
-       *
-       * Both `window.localStorage` and `null` are therefore
-       * accepted as "this event is for us". Anything else is
-       * filtered out, which is what excludes `sessionStorage`
-       * and other origins.
-       */
-      if (
-        event.storageArea !== null &&
-        event.storageArea !== window.localStorage
-      ) {
-        return;
-      }
-
-      /*
-       * `event.key` is `null` for `localStorage.clear()`. A
-       * clear that affects our key (or the whole store)
-       * re-reads from an empty store, which produces
-       * `EMPTY_FAVORITES`.
-       */
-      if (event.key !== null && event.key !== STORAGE_KEY) {
-        return;
-      }
-
-      setIds(readFavorites());
-    };
-
-    window.addEventListener("storage", handleStorage);
-
-    return () => {
-      window.removeEventListener("storage", handleStorage);
-    };
-  }, []);
 
   const favorites = useMemo<readonly string[]>(
     () => (ids.length === 0 ? EMPTY_FAVORITES : ids),
@@ -349,27 +431,30 @@ export function useFavorites(): FavoritesApi {
     if (typeof locationId !== "string") return;
     if (!VALID_IDS.has(locationId)) return;
 
-    setIds((current) => {
-      const base = current;
+    const base = getSnapshot();
 
-      const next = base.includes(locationId)
-        ? base.filter((id) => id !== locationId)
-        : [...base, locationId];
+    const next = base.includes(locationId)
+      ? base.filter((id) => id !== locationId)
+      : [...base, locationId];
 
-      /*
-       * Persist synchronously. The list is small enough
-       * that there is no benefit to debouncing, and
-       * synchronous writes keep the UI and storage in
-       * lockstep — important for the cross-tab listener,
-       * which fires on the other tab the moment this
-       * write completes.
-       */
-      writeFavorites(next);
+    snapshot =
+      next.length === 0 ? EMPTY_FAVORITES : Object.freeze(next);
 
-      return next.length === 0
-        ? EMPTY_FAVORITES
-        : Object.freeze(next);
-    });
+    /*
+     * Persist synchronously. The list is small enough
+     * that there is no benefit to debouncing, and
+     * synchronous writes keep the UI and storage in
+     * lockstep — important for the cross-tab listener,
+     * which fires on the other tab the moment this
+     * write completes.
+     *
+     * The write happens here, outside any React state
+     * updater, so it runs exactly once per toggle even
+     * under StrictMode.
+     */
+    writeFavorites(next);
+
+    emit();
   }, []);
 
   return {
