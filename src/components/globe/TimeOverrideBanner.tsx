@@ -54,6 +54,16 @@
  * because an ISO string reads as machine output to most
  * users.
  *
+ * ## ICU variance on midnight
+ *
+ * Some ICU builds — Ubuntu's, notably — render midnight as
+ * `"24:00"` under `hour12: false` instead of `"00:00"`. That
+ * is the same discrepancy that `lib/time.ts` normalizes for
+ * its own outputs. The banner uses its own formatter for
+ * historical reasons, so it needs its own normalization. If
+ * the formatter ever moves to a shared module, this
+ * normalization should move with it.
+ *
  * ## Why `useSyncExternalStore`
  *
  * The override is a module-level primitive owned by
@@ -146,15 +156,29 @@ const TIMESTAMP_FORMATTER = new Intl.DateTimeFormat("en-US", {
 /**
  * Format an override timestamp for display.
  *
- * Renders as "June 20, 2024, 20:51" — the `Intl` output for
- * the options above, with the "UTC" suffix appended manually
- * because adding it to the options produces an output that
- * duplicates the zone name in some locales.
+ * Renders as "June 20, 2024, 20:51 UTC" — the `Intl` output
+ * for the options above, with the "UTC" suffix appended
+ * manually because adding it to the options produces an output
+ * that duplicates the zone name in some locales.
+ *
+ * ## The midnight substitution
+ *
+ * Some ICU builds render midnight under `hour12: false` as
+ * `"24:00"` rather than `"00:00"`. The standard astronomical
+ * convention — and the format every other surface in this app
+ * uses — is `"00:00"`.
+ *
+ * The `^24:` anchor means the substitution only fires when
+ * `24` is followed by a colon at the start of the string. A
+ * date like `"June 24, 2024"` is left alone — its `24` is
+ * followed by a comma, not a colon. A time like `"12:24"` is
+ * left alone — its `24` is not at the start.
  *
  * Exported for testing.
  */
 export function formatOverrideTimestamp(ms: number): string {
-  return `${TIMESTAMP_FORMATTER.format(new Date(ms))} UTC`;
+  const formatted = TIMESTAMP_FORMATTER.format(new Date(ms));
+  return `${formatted.replace(/^24:/, "00:")} UTC`;
 }
 
 /* -------------------------------------------------------------------------- */
