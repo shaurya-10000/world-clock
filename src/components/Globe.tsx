@@ -741,8 +741,9 @@ export default function Globe({
           className="
             pointer-events-auto
             min-w-0
-            w-full
+            w-auto
             max-w-[220px]
+            sm:w-full
             sm:max-w-[260px]
             lg:max-w-[320px]
           "
