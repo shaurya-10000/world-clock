@@ -11,7 +11,7 @@ Rotate the planet, search 180+ cities, and time-travel to the next solstice, an 
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 
-[**Live demo**](<LIVE_URL>) · [**Watch the demo**](<DEMO_VIDEO_URL>) · [**Report a bug**](https://github.com/shaurya-10000/world-clock/issues)
+[**Live demo**](https://world-clock-gray.vercel.app) · [**Watch the demo**](<DEMO_VIDEO_URL>) · [**Report a bug**](https://github.com/shaurya-10000/world-clock/issues)
 
 ![World Clock hero](docs/images/hero.png)
 
@@ -326,7 +326,7 @@ Target: 60 fps on mid-tier mobile hardware.
 
 ## Credits
 
-- Earth textures: <TEXTURE_SOURCE_AND_LICENSE>
+- Earth textures: NASA Visible Earth / Blue Marble (public domain)
 - Country boundaries: [world-atlas](https://github.com/topojson/world-atlas) (Natural Earth, public domain)
 - Solar algorithms: Jean Meeus, *Astronomical Algorithms* (Willmann-Bell)
 - 3D globe layers: [three-globe](https://github.com/vasturiano/three-globe) by Vasco Asturiano
@@ -339,6 +339,6 @@ Released under the MIT license. See [LICENSE](./LICENSE).
 
 <div align="center">
 
-Built by <AUTHOR> · [Report a bug](https://github.com/shaurya-10000/world-clock/issues)
+Built by [shaurya-10000](https://github.com/shaurya-10000) · [Report a bug](https://github.com/shaurya-10000/world-clock/issues)
 
 </div>
