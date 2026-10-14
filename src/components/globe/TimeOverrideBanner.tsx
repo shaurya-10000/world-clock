@@ -50,9 +50,11 @@
  * time zone that applies to every possible override.
  *
  * The date is rendered in a medium-length human format —
- * "June 20, 2024, 20:51 UTC" — rather than an ISO string,
+ * "June 20, 2024 at 20:51 UTC" — rather than an ISO string,
  * because an ISO string reads as machine output to most
- * users.
+ * users. The exact joining word between date and time
+ * ("at" vs a comma) is locale- and ICU-dependent, and this
+ * component does not normalize it.
  *
  * ## ICU variance on midnight
  *
@@ -156,29 +158,37 @@ const TIMESTAMP_FORMATTER = new Intl.DateTimeFormat("en-US", {
 /**
  * Format an override timestamp for display.
  *
- * Renders as "June 20, 2024, 20:51 UTC" — the `Intl` output
- * for the options above, with the "UTC" suffix appended
- * manually because adding it to the options produces an output
- * that duplicates the zone name in some locales.
+ * Renders as "June 20, 2024 at 20:51 UTC" or
+ * "June 20, 2024, 20:51 UTC" — the exact separator depends
+ * on the ICU build, which is why this function does not
+ * attempt to normalize the joining pattern. What it does
+ * normalize is the hour.
  *
  * ## The midnight substitution
  *
  * Some ICU builds render midnight under `hour12: false` as
  * `"24:00"` rather than `"00:00"`. The standard astronomical
- * convention — and the format every other surface in this app
- * uses — is `"00:00"`.
+ * convention — and the format every other surface in this
+ * app uses — is `"00:00"`.
  *
- * The `^24:` anchor means the substitution only fires when
- * `24` is followed by a colon at the start of the string. A
- * date like `"June 24, 2024"` is left alone — its `24` is
- * followed by a comma, not a colon. A time like `"12:24"` is
- * left alone — its `24` is not at the start.
+ * The regex uses `\b` word boundaries rather than `^` and `$`
+ * anchors. The time is embedded inside a longer string
+ * ("January 1, 2024 at 24:00 UTC") whose leading text differs
+ * across ICU builds, so an anchored match would silently fail
+ * on the builds that insert a word before the time. The word
+ * boundary matches `24:00` wherever it appears as a standalone
+ * token, which is exactly the region of interest.
+ *
+ * A date like "June 24, 2024" is left alone — its `24` is not
+ * followed by a colon. A minute like "12:24" is left alone —
+ * its `24` is preceded by a digit, and `\b` requires a
+ * word-to-non-word transition.
  *
  * Exported for testing.
  */
 export function formatOverrideTimestamp(ms: number): string {
   const formatted = TIMESTAMP_FORMATTER.format(new Date(ms));
-  return `${formatted.replace(/^24:/, "00:")} UTC`;
+  return `${formatted.replace(/\b24:00\b/, "00:00")} UTC`;
 }
 
 /* -------------------------------------------------------------------------- */
