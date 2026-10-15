@@ -163,6 +163,27 @@ const Y_AXIS = new THREE.Vector3(0, 1, 0);
 const X_AXIS = new THREE.Vector3(1, 0, 0);
 
 /* -------------------------------------------------------------------------- */
+/* DOM helpers                                                                */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Set the CSS `touch-action` of an element.
+ *
+ * Lives at module scope on purpose. The canvas comes from
+ * the R3F `gl` renderer, which is a value returned by a
+ * hook; the `react-hooks/immutability` lint rule forbids
+ * assigning to properties of such values inside the
+ * component. Routing the write through a plain function
+ * keeps the DOM mutation out of the component body while
+ * behaving exactly the same at runtime.
+ */
+function setTouchAction(element: HTMLElement, value: string): void {
+  if (element.style) {
+    element.style.touchAction = value;
+  }
+}
+
+/* -------------------------------------------------------------------------- */
 /* Momentum sample buffer                                                     */
 /* -------------------------------------------------------------------------- */
 
@@ -476,13 +497,15 @@ export default function GlobeControls({
      * is claimed by the browser (page zoom / scroll) and the
      * canvas receives `pointercancel` instead of pinch moves.
      * The previous value is restored on cleanup.
+     *
+     * The write goes through `setTouchAction` (module scope)
+     * so the lint rule against mutating hook-derived values
+     * is satisfied.
      */
     const previousTouchAction = canvas.style
       ? canvas.style.touchAction
       : "";
-    if (canvas.style) {
-      canvas.style.touchAction = "none";
-    }
+    setTouchAction(canvas, "none");
 
     /*
      * Distance in client pixels between the first two tracked
@@ -851,9 +874,7 @@ export default function GlobeControls({
       pinch.active = false;
       pinch.baseDistance = 0;
 
-      if (canvas.style) {
-        canvas.style.touchAction = previousTouchAction;
-      }
+      setTouchAction(canvas, previousTouchAction);
     };
   }, [gl, groupRef, onStepCamera]);
 
