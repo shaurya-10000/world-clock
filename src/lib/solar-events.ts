@@ -647,6 +647,25 @@ export function findSunset(
  *
  * "Local solar noon" is the instant the sun reaches its
  * highest point in the sky for that day.
+ *
+ * ## Why the check is made on the *refined* instant
+ *
+ * `approximateNoonMs` ignores the equation of time, so the
+ * true noon can differ from the approximation by up to about
+ * ±16 minutes. An earlier version compared the *approximate*
+ * noon against `from` and then returned the *refined* noon
+ * without re-checking. When `from` fell in the gap between
+ * the two (for example, a few minutes after the true noon but
+ * before the approximate one), the function returned an
+ * instant *earlier* than `from`, violating the "at or after"
+ * contract. That made the result — and the test that calls it
+ * with the current time — depend on the time of day.
+ *
+ * The fix is to refine first and compare the refined instant
+ * against `from`, moving on to the next day when it is
+ * earlier. The approximate noon is no longer used to skip a
+ * day, because the true noon may land after `from` even when
+ * the approximation lands before it.
  */
 export function findSolarNoon(
   lat: number,
@@ -655,21 +674,27 @@ export function findSolarNoon(
 ): Date {
   const fromMs = from.getTime();
 
-  let lastApproxNoonMs = fromMs;
+  let lastRefinedNoon: Date = from;
 
   for (let dayOffset = 0; dayOffset < 3; dayOffset += 1) {
     const anchorMs = fromMs + dayOffset * MS_PER_DAY;
 
     const approxNoonMs = approximateNoonMs(anchorMs, lng);
+    const refinedNoon = refineNoon(lat, lng, approxNoonMs);
 
-    lastApproxNoonMs = approxNoonMs;
+    lastRefinedNoon = refinedNoon;
 
-    if (approxNoonMs < fromMs) continue;
-
-    return refineNoon(lat, lng, approxNoonMs);
+    if (refinedNoon.getTime() >= fromMs) {
+      return refinedNoon;
+    }
   }
 
-  return new Date(lastApproxNoonMs);
+  /*
+   * Unreachable in practice — one of the first two days
+   * always yields a noon at or after `from`. Kept for type
+   * totality.
+   */
+  return lastRefinedNoon;
 }
 
 /**
