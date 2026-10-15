@@ -45,14 +45,14 @@ Rotate the planet, search 180+ cities, and time-travel to the next solstice, an 
 - **180+ cities** with WGS84 coordinates and IANA time zones, plus favorites that persist across reloads.
 - **Accessible by design:** full keyboard support, screen-reader labels, and reduced-motion support throughout.
 - **Fast:** one shared ticker, cached `Intl` formatters, and zero allocations in the frame loop.
-- **Well tested:** 2,804 tests across 130 files, with 88.79% statement coverage. See [Test results](#test-results).
+- **Well tested:** 2,804 tests across 130 files, passing in about 29 seconds, with 88.79% statement coverage. See [Test results](#test-results).
 - **Audited:** Lighthouse scores of 100 for Best Practices and SEO on both desktop and mobile. See [Lighthouse](#lighthouse).
 
 ### At a glance
 
 | Check | Result |
 | --- | --- |
-| **Tests** | 2,804 passing across 130 files ([details](#test-results)) |
+| **Tests** | 2,804 passing across 130 files in 29.04 s ([details](#test-results)) |
 | **Coverage** | 88.79% statements, 80.26% branches, 90.14% functions, 89.79% lines |
 | **Lighthouse, desktop** | Performance 90, Accessibility 96, Best Practices 100, SEO 100 ([details](#lighthouse)) |
 | **Lighthouse, mobile** | Performance 71, Accessibility 100, Best Practices 100, SEO 100 |
@@ -292,14 +292,29 @@ Latest full run, Vitest 5.0.0, 15 October 2026:
 | --- | --- |
 | Test files | **130 passed** (130) |
 | Tests | **2,804 passed** (2,804) |
-| Duration | 62 to 68 s for the full suite |
+| Duration | **29.04 s** for the full suite |
 
 <table>
   <tr>
-    <td align="center" width="50%"><img src="docs/images/vitest.png" alt="Vitest run: 130 test files and 2,804 tests passing" /><br /><sub><b>npm run test:run</b></sub></td>
+    <td align="center" width="50%"><img src="docs/images/vitest.png" alt="Vitest run: 130 test files and 2,804 tests passing in 29.04 seconds" /><br /><sub><b>npm run test:run</b></sub></td>
     <td align="center" width="50%"><img src="docs/images/coverage.png" alt="Coverage report summary by folder: 88.79% statements, 80.26% branches, 90.14% functions, 89.79% lines" /><br /><sub><b>npm run test:coverage</b></sub></td>
   </tr>
 </table>
+
+#### Where the time goes
+
+Vitest reports how the run's cumulative worker time splits across phases:
+
+| Phase | Share |
+| --- | ---: |
+| Environment | 47% |
+| Setup | 27% |
+| Tests | 13% |
+| Import | 10% |
+| Transform | 3% |
+| Worker | 1% |
+
+These are shares of summed time across parallel workers, not of the 29.04 s wall clock. The test bodies themselves are only 13% of the total. Most of the cost is per-file overhead: each of the 130 files gets a fresh `happy-dom` environment and runs both [setup files](#setup-order-matters). That is the price of full isolation between suites, and it is why the suite stays fast as individual tests are added. Timings vary by machine, so treat the duration as a range, not an exact figure.
 
 #### Coverage (v8)
 
