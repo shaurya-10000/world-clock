@@ -46,6 +46,18 @@ Rotate the planet, search 180+ cities, and time-travel to the next solstice, an 
 - **Accessible by design:** full keyboard support, screen-reader labels, and reduced-motion support throughout.
 - **Fast:** one shared ticker, cached `Intl` formatters, and zero allocations in the frame loop.
 - **Well tested:** 2,804 tests across 130 files, with 88.79% statement coverage. See [Test results](#test-results).
+- **Audited:** Lighthouse scores of 100 for Best Practices and SEO on both desktop and mobile. See [Lighthouse](#lighthouse).
+
+### At a glance
+
+| Check | Result |
+| --- | --- |
+| **Tests** | 2,804 passing across 130 files ([details](#test-results)) |
+| **Coverage** | 88.79% statements, 80.26% branches, 90.14% functions, 89.79% lines |
+| **Lighthouse, desktop** | Performance 90, Accessibility 96, Best Practices 100, SEO 100 ([details](#lighthouse)) |
+| **Lighthouse, mobile** | Performance 71, Accessibility 100, Best Practices 100, SEO 100 |
+
+<sub>Measured on 15 October 2026. Lighthouse figures are single runs against the production deployment.</sub>
 
 <table>
   <tr>
