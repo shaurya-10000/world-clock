@@ -740,9 +740,11 @@ export default function Globe({
         <div
           className="
             pointer-events-auto
-            min-w-0
+            shrink-0
             w-auto
             max-w-[220px]
+            sm:min-w-0
+            sm:shrink
             sm:w-full
             sm:max-w-[260px]
             lg:max-w-[320px]
@@ -862,7 +864,25 @@ export default function Globe({
               strokeWidth={1.7}
             />
           </button>
+        </div>
+      </div>
 
+      {/*
+       * The zoom (+/-) control lives in its own bottom-right
+       * wrapper, a sibling of the chrome bar. Same
+       * `pointer-events-none` outer / `pointer-events-auto`
+       * inner pattern as the chrome bar, so clicks in the
+       * gaps still reach the canvas.
+       */}
+      <div
+        className="
+          pointer-events-none
+          absolute bottom-4 right-3 z-30
+          sm:bottom-6 sm:right-4
+          lg:bottom-8 lg:right-6
+        "
+      >
+        <div className="pointer-events-auto">
           <GlobeSizeToggle
             stepIndex={effectiveStepIndex}
             stepCount={CAMERA_DISTANCE_STEPS.length}
