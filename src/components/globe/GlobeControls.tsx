@@ -53,6 +53,20 @@ const VELOCITY_SAMPLE_COUNT = 6;
  */
 const MAX_FRAME_DELTA_SECONDS = 0.1;
 
+/**
+ * How much the distance between two fingers must change,
+ * relative to where it was when the last zoom step fired (or
+ * when the pinch began), before another camera step is taken.
+ *
+ * A value of 1.25 means: spreading the fingers 25% further
+ * apart zooms in one step, bringing them 20% (1 / 1.25)
+ * closer together zooms out one step. After each step the
+ * baseline is reset to the current distance, so one long
+ * pinch can walk several steps along the camera-distance
+ * ladder.
+ */
+const PINCH_STEP_RATIO = 1.25;
+
 /* -------------------------------------------------------------------------- */
 /* Types                                                                      */
 /* -------------------------------------------------------------------------- */
@@ -260,8 +274,10 @@ class MomentumBuffer {
  *   3. **Auto-rotate** — after
  *      `AUTO_ROTATE_RESUME_DELAY_MS` of inactivity, the
  *      globe starts a slow idle Y-axis spin.
- *   4. **Zoom** — wheel events advance one step on the
- *      camera-distance ladder in `Globe.tsx`.
+ *   4. **Zoom** — wheel events and two-finger touch pinches
+ *      advance steps on the camera-distance ladder in
+ *      `Globe.tsx`. While two fingers are down the globe does
+ *      not rotate; it only zooms.
  *
  * All rotation work happens in the frame loop by mutating
  * the globe group's quaternion directly. No React state is
@@ -337,6 +353,26 @@ export default function GlobeControls({
    * to gate auto-rotate.
    */
   const lastInteractionRef = useRef<number>(0);
+
+  /*
+   * Currently-down touch pointers, keyed by `pointerId`, with
+   * their latest client position. Only touch pointers are
+   * tracked; mouse and pen input keep the plain single-pointer
+   * drag path.
+   */
+  const touchPointersRef = useRef(
+    new Map<number, { x: number; y: number }>(),
+  );
+
+  /*
+   * Pinch-zoom state. `active` is true while two or more touch
+   * pointers are down. `baseDistance` is the finger distance
+   * the next zoom step is measured against. Mutated in place.
+   */
+  const pinchRef = useRef<{ active: boolean; baseDistance: number }>({
+    active: false,
+    baseDistance: 0,
+  });
 
   /*
    * The reset-north animation is orchestrated in the frame
@@ -431,12 +467,77 @@ export default function GlobeControls({
     const canvas = gl.domElement;
     if (!canvas) return;
 
+    const touches = touchPointersRef.current;
+    const pinch = pinchRef.current;
+
+    /*
+     * Tell the browser this canvas handles touch gestures
+     * itself. Without `touch-action: none`, a two-finger pinch
+     * is claimed by the browser (page zoom / scroll) and the
+     * canvas receives `pointercancel` instead of pinch moves.
+     * The previous value is restored on cleanup.
+     */
+    const previousTouchAction = canvas.style
+      ? canvas.style.touchAction
+      : "";
+    if (canvas.style) {
+      canvas.style.touchAction = "none";
+    }
+
+    /*
+     * Distance in client pixels between the first two tracked
+     * touch pointers, or 0 when fewer than two are down.
+     */
+    const measurePinchDistance = (): number => {
+      const iterator = touches.values();
+      const first = iterator.next().value;
+      const second = iterator.next().value;
+
+      if (!first || !second) return 0;
+
+      return Math.hypot(first.x - second.x, first.y - second.y);
+    };
+
     /* ------------------------------ down ---------------------------- */
 
     const onPointerDown = (event: PointerEvent): void => {
       /* Only respond to the primary button / first touch. */
       if (event.button !== 0 && event.pointerType === "mouse") {
         return;
+      }
+
+      /*
+       * Touch bookkeeping for pinch-zoom. A second finger
+       * turns the gesture from a drag into a pinch: the drag
+       * is ended without momentum, and from then on finger
+       * movement only changes the zoom step.
+       */
+      if (event.pointerType === "touch") {
+        touches.set(event.pointerId, {
+          x: event.clientX,
+          y: event.clientY,
+        });
+
+        if (touches.size >= 2) {
+          isDraggingRef.current = false;
+          velocityRef.current.x = 0;
+          velocityRef.current.y = 0;
+          samplesRef.current.clear();
+          resetTargetRef.current = null;
+
+          pinch.active = true;
+          pinch.baseDistance = measurePinchDistance();
+
+          try {
+            canvas.setPointerCapture(event.pointerId);
+          } catch {
+            /* Capture is best-effort; events still reach the canvas. */
+          }
+
+          lastInteractionRef.current = performance.now();
+          event.preventDefault();
+          return;
+        }
       }
 
       const group = groupRef.current;
@@ -480,6 +581,45 @@ export default function GlobeControls({
     /* ------------------------------ move ---------------------------- */
 
     const onPointerMove = (event: PointerEvent): void => {
+      if (event.pointerType === "touch") {
+        const tracked = touches.get(event.pointerId);
+
+        if (tracked) {
+          tracked.x = event.clientX;
+          tracked.y = event.clientY;
+        }
+
+        /*
+         * Pinch in progress: convert the change in finger
+         * distance into camera steps and never rotate.
+         */
+        if (pinch.active) {
+          const distance = measurePinchDistance();
+
+          if (distance <= 0) return;
+
+          if (pinch.baseDistance <= 0) {
+            pinch.baseDistance = distance;
+            return;
+          }
+
+          const ratio = distance / pinch.baseDistance;
+
+          if (ratio >= PINCH_STEP_RATIO) {
+            /* Fingers spreading apart: zoom in. */
+            onStepCamera(-1);
+            pinch.baseDistance = distance;
+          } else if (ratio <= 1 / PINCH_STEP_RATIO) {
+            /* Fingers coming together: zoom out. */
+            onStepCamera(1);
+            pinch.baseDistance = distance;
+          }
+
+          lastInteractionRef.current = performance.now();
+          return;
+        }
+      }
+
       if (!isDraggingRef.current) return;
 
       const group = groupRef.current;
@@ -567,7 +707,42 @@ export default function GlobeControls({
       }
     };
 
+    /*
+     * Remove a lifted/cancelled touch pointer from the pinch
+     * bookkeeping. Returns `true` when the event belonged to a
+     * pinch and has been fully handled. After a pinch ends the
+     * remaining finger does not resume dragging until it is
+     * lifted and pressed again, which avoids the globe jumping
+     * to that finger's position.
+     */
+    const endTouchPointer = (event: PointerEvent): boolean => {
+      if (event.pointerType !== "touch") return false;
+
+      touches.delete(event.pointerId);
+
+      if (!pinch.active) return false;
+
+      if (touches.size < 2) {
+        pinch.active = false;
+        pinch.baseDistance = 0;
+      } else {
+        pinch.baseDistance = measurePinchDistance();
+      }
+
+      try {
+        canvas.releasePointerCapture(event.pointerId);
+      } catch {
+        /* Capture may already have been released. */
+      }
+
+      lastInteractionRef.current = performance.now();
+
+      return true;
+    };
+
     const onPointerUp = (event: PointerEvent): void => {
+      if (endTouchPointer(event)) return;
+
       if (!isDraggingRef.current) return;
 
       endDrag(event);
@@ -609,6 +784,8 @@ export default function GlobeControls({
     /* --------------------------- cancel ----------------------------- */
 
     const onPointerCancel = (event: PointerEvent): void => {
+      if (endTouchPointer(event)) return;
+
       if (!isDraggingRef.current) return;
 
       endDrag(event);
@@ -669,6 +846,14 @@ export default function GlobeControls({
       canvas.removeEventListener("pointerup", onPointerUp);
       canvas.removeEventListener("pointercancel", onPointerCancel);
       canvas.removeEventListener("wheel", onWheel);
+
+      touches.clear();
+      pinch.active = false;
+      pinch.baseDistance = 0;
+
+      if (canvas.style) {
+        canvas.style.touchAction = previousTouchAction;
+      }
     };
   }, [gl, groupRef, onStepCamera]);
 
