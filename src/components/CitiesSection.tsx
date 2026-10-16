@@ -82,6 +82,24 @@ const RESULTS_COUNT_TESTID = "cities-results-count";
 const DEFAULT_REDUCED_MOTION = false;
 
 /**
+ * Fixed width of the time / date column in each city row.
+ *
+ * The favorite heart sits immediately to the left of this
+ * column, and the column is right-anchored inside a
+ * `justify-between` row. If the column's width followed its
+ * content, the heart's horizontal position would change with
+ * the text ("9:05 AM" vs "12:05 PM", "Jan 5" vs "Sep 30"),
+ * and the hearts would not form a straight vertical line down
+ * the list. Pinning the width keeps every heart at the same
+ * x-position in every row, in both the Favorites section and
+ * the All Cities section.
+ *
+ * Wide enough for the longest time string at the row's
+ * monospace size (`12:59 PM`) and the longest short date.
+ */
+const TIME_COLUMN_WIDTH_CLASS = "w-[5.5rem]";
+
+/**
  * The scrollbar styling for the results list.
  */
 const SCROLLBAR_STYLES = `
@@ -313,12 +331,20 @@ function CityRow({
           onToggle={handleToggleFavorite}
         />
 
-        <div className="pointer-events-none text-right">
-          <p className="font-mono text-[18px] font-medium leading-none tracking-[-0.06em] tabular-nums text-white">
+        {/*
+         * Fixed-width time column. The width is pinned (not
+         * content-sized) so the heart to its left lands at the
+         * same x-position in every row. See
+         * `TIME_COLUMN_WIDTH_CLASS`.
+         */}
+        <div
+          className={`pointer-events-none shrink-0 text-right ${TIME_COLUMN_WIDTH_CLASS}`}
+        >
+          <p className="whitespace-nowrap font-mono text-[18px] font-medium leading-none tracking-[-0.06em] tabular-nums text-white">
             {time}
           </p>
 
-          <p className="mt-1.5 text-[9px] font-medium tracking-[0.04em] text-white/35">
+          <p className="mt-1.5 whitespace-nowrap text-[9px] font-medium tracking-[0.04em] text-white/35">
             {date}
           </p>
         </div>
@@ -326,7 +352,7 @@ function CityRow({
         <ArrowRight
           aria-hidden="true"
           className="
-            pointer-events-none size-[14px] -translate-x-1
+            pointer-events-none size-[14px] shrink-0 -translate-x-1
             text-white/45 opacity-0 transition-all duration-200
             group-hover:translate-x-0 group-hover:opacity-100
           "
