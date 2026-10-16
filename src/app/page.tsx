@@ -239,13 +239,30 @@ export default function Home() {
   return (
     <>
       {/*
-       * <main> is the page shell. CitiesSection must NOT live
+       * <main> is the page shell.
+       *
+       * On mobile it is locked to exactly one visible screen
+       * (`h-dvh` + `overflow-hidden`). The header (76px + 1px
+       * border) and the content area (`100dvh - 76px`) add up
+       * to slightly more than one screen, and the old
+       * `min-h-screen` (100vh, the *large* viewport) was taller
+       * than the visible area while the browser's address bar
+       * was showing. Together those let the page scroll and
+       * exposed a strip of the main background. From `md` up
+       * the page stacks the globe and clock sections and
+       * scrolls normally.
+       * CitiesSection must NOT live
        * inside it: the drawer sets `inert` on the first <main>
        * in the document while it is open, which would disable
        * the drawer itself (its own ancestor) and make every
        * button and the scroll area unresponsive.
        */}
-      <main className="min-h-screen bg-(--background) text-(--foreground)">
+      <main
+        className="
+          h-dvh overflow-hidden bg-(--background) text-(--foreground)
+          md:h-auto md:min-h-screen md:overflow-visible
+        "
+      >
         <DayNightFavicon location={clockLocation} />
 
         <Header
@@ -346,7 +363,7 @@ export function MobileLayout({
   if (view === "zones") {
     return (
       <div
-        className="flex w-full flex-col overflow-y-auto overflow-x-hidden"
+        className="flex w-full flex-col overflow-y-auto overflow-x-hidden overscroll-contain"
         style={{ height: CONTENT_HEIGHT }}
         aria-label="World clocks"
       >
