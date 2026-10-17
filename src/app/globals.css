@@ -14,8 +14,8 @@
   --surface-strong: rgba(12, 14, 18, 0.92);
 
   /* Text hierarchy. */
-  --muted: rgba(245, 247, 248, 0.62);
-  --subtle: rgba(245, 247, 248, 0.38);
+  --muted: rgba(245, 247, 248, 0.72);
+  --subtle: rgba(245, 247, 248, 0.54);
 
   /* Borders. */
   --border: rgba(255, 255, 255, 0.09);

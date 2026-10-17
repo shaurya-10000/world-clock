@@ -800,7 +800,7 @@ export default function Globe({
                     "focus-visible:ring-offset-black/50",
                     active
                       ? "bg-white/[0.11] text-white shadow-[0_0_24px_rgba(255,255,255,0.05)]"
-                      : "text-white/42 hover:bg-white/[0.045] hover:text-white/72",
+                      : "text-white/65 hover:bg-white/[0.045] hover:text-white/72",
                   ].join(" ")}
                 >
                   <span className="inline-flex items-center gap-1 sm:gap-2">
@@ -814,7 +814,7 @@ export default function Globe({
                     {count !== null && (
                       <span
                         aria-hidden="true"
-                        className="font-mono text-[8px] tabular-nums text-white/30"
+                        className="font-mono text-[8px] tabular-nums text-white/55"
                       >
                         {count}
                       </span>

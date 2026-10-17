@@ -200,7 +200,7 @@ export function FavoriteButton({
         "focus-visible:ring-[var(--favorite)]",
         active
           ? "text-[var(--favorite)]"
-          : "text-white/30 hover:text-white/70",
+          : "text-white/55 hover:text-white/70",
       ].join(" ")}
     >
       <Heart
@@ -318,7 +318,7 @@ function CityRow({
         </div>
 
         <div className="mt-1.5">
-          <p className="truncate text-[10px] font-medium uppercase tracking-[0.08em] text-white/45">
+          <p className="truncate text-[10px] font-medium uppercase tracking-[0.08em] text-white/60">
             {location.country}
           </p>
         </div>
@@ -344,7 +344,7 @@ function CityRow({
             {time}
           </p>
 
-          <p className="mt-1.5 whitespace-nowrap text-[9px] font-medium tracking-[0.04em] text-white/35">
+          <p className="mt-1.5 whitespace-nowrap text-[9px] font-medium tracking-[0.04em] text-white/55">
             {date}
           </p>
         </div>
@@ -353,7 +353,7 @@ function CityRow({
           aria-hidden="true"
           className="
             pointer-events-none size-[14px] shrink-0 -translate-x-1
-            text-white/45 opacity-0 transition-all duration-200
+            text-white/60 opacity-0 transition-all duration-200
             group-hover:translate-x-0 group-hover:opacity-100
           "
           strokeWidth={1.4}
@@ -376,7 +376,7 @@ function SectionLabel({
     <p
       className="
         px-6 pt-5 pb-2 text-[9px] font-black uppercase
-        tracking-[0.22em] text-white/30
+        tracking-[0.22em] text-white/55
       "
     >
       {children}
@@ -408,7 +408,7 @@ function SearchField({
           <Search
             aria-hidden="true"
             className="
-              size-[15px] shrink-0 text-white/30
+              size-[15px] shrink-0 text-white/55
               transition-colors duration-300
               group-focus-within:text-white/60
             "
@@ -428,7 +428,7 @@ function SearchField({
             className="
               h-11 min-w-0 flex-1 bg-transparent text-[11px]
               font-bold uppercase tracking-[0.12em] text-white
-              outline-none placeholder:text-white/25
+              outline-none placeholder:text-white/50
             "
           />
 
@@ -439,7 +439,7 @@ function SearchField({
               aria-label="Clear search"
               className="
                 flex size-7 shrink-0 items-center justify-center
-                rounded-full text-white/30 transition-colors
+                rounded-full text-white/55 transition-colors
                 hover:bg-white/[0.06] hover:text-white
                 focus-visible:outline-none
                 focus-visible:ring-1 focus-visible:ring-white/40
@@ -494,11 +494,11 @@ function EmptyState() {
           strokeWidth={1.3}
         />
 
-        <p className="mt-4 text-[11px] font-black uppercase tracking-[0.16em] text-white/40">
+        <p className="mt-4 text-[11px] font-black uppercase tracking-[0.16em] text-white/60">
           No locations found
         </p>
 
-        <p className="mt-2 text-xs text-white/25">
+        <p className="mt-2 text-xs text-white/50">
           Try another city or country.
         </p>
       </div>
@@ -844,7 +844,7 @@ export default function CitiesSection({
                     </div>
 
                     <div>
-                      <p className="text-[9px] font-black uppercase tracking-[0.22em] text-white/30">
+                      <p className="text-[9px] font-black uppercase tracking-[0.22em] text-white/55">
                         World Clock
                       </p>
 
@@ -863,7 +863,7 @@ export default function CitiesSection({
                     aria-label="Close cities"
                     className="
                       flex size-9 items-center justify-center
-                      rounded-full text-white/40 transition-colors
+                      rounded-full text-white/60 transition-colors
                       duration-200 hover:bg-white/[0.06]
                       hover:text-white focus-visible:outline-none
                       focus-visible:ring-1
@@ -883,7 +883,7 @@ export default function CitiesSection({
                 <div className="mt-4 flex items-center justify-between">
                   <p
                     data-testid={RESULTS_COUNT_TESTID}
-                    className="text-[9px] font-black uppercase tracking-[0.22em] text-white/30"
+                    className="text-[9px] font-black uppercase tracking-[0.22em] text-white/55"
                   >
                     {results.length}{" "}
                     {results.length === 1
@@ -891,7 +891,7 @@ export default function CitiesSection({
                       : "Locations"}
                   </p>
 
-                  <p className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.18em] text-white/30">
+                  <p className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.18em] text-white/55">
                     <span
                       aria-hidden="true"
                       className="
