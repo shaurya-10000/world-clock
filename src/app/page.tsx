@@ -259,8 +259,8 @@ export default function Home() {
        */}
       <main
         className="
-          h-dvh overflow-hidden bg-(--background) text-(--foreground)
-          md:h-auto md:min-h-screen md:overflow-visible
+          flex h-dvh flex-col overflow-hidden bg-(--background) text-(--foreground)
+          md:block md:h-auto md:min-h-dvh md:overflow-visible
         "
       >
         <DayNightFavicon location={clockLocation} />
@@ -300,7 +300,7 @@ export function DesktopLayout({
     <>
       <section
         id="explore"
-        className="relative w-full overflow-hidden"
+        className="relative w-full scroll-mt-[76px] overflow-hidden"
         style={{ height: CONTENT_HEIGHT }}
       >
         <div
@@ -333,7 +333,7 @@ export function DesktopLayout({
        */}
       <div
         className="flex w-full flex-col"
-        style={{ minHeight: CONTENT_HEIGHT }}
+        style={{ height: CONTENT_HEIGHT }}
       >
         <WorldClockSection
           location={clockLocation}
@@ -363,8 +363,7 @@ export function MobileLayout({
   if (view === "zones") {
     return (
       <div
-        className="flex w-full flex-col overflow-y-auto overflow-x-hidden overscroll-contain"
-        style={{ height: CONTENT_HEIGHT }}
+        className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto overflow-x-hidden overscroll-contain"
         aria-label="World clocks"
       >
         <WorldClockSection
@@ -378,8 +377,7 @@ export function MobileLayout({
   return (
     <section
       id="explore"
-      className="relative flex w-full justify-center overflow-hidden"
-      style={{ height: CONTENT_HEIGHT }}
+      className="relative flex min-h-0 w-full flex-1 justify-center overflow-hidden"
     >
       <div
         aria-hidden="true"

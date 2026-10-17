@@ -730,7 +730,7 @@ export default function Header({
   return (
     <header
       className={`
-        sticky top-0 z-50 w-full border-b backdrop-blur-xl
+        sticky top-0 z-50 box-border h-[76px] w-full shrink-0 border-b backdrop-blur-xl
         transition-[background-color,border-color] duration-500
         ${
           scrolled
@@ -741,7 +741,7 @@ export default function Header({
     >
       <div
         className="
-          mx-auto flex h-[76px] max-w-[1600px] items-center
+          mx-auto flex h-full max-w-[1600px] items-center
           justify-between px-5 sm:px-8 lg:px-10 xl:px-16
         "
       >

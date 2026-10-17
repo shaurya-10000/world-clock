@@ -705,7 +705,7 @@ export default function Globe({
        * WebGL initialization failure does not take down the
        * whole page.
        */}
-      <div className="absolute inset-0">
+      <div className="absolute inset-0 touch-none">
         <GlobeCanvasBoundary>
           <GlobeCanvas
             reducedMotion={reducedMotion}
