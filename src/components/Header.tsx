@@ -3,6 +3,7 @@
 import {
   AnimatePresence,
   motion,
+  useReducedMotion,
 } from "framer-motion";
 import {
   Clock3,
@@ -26,13 +27,8 @@ export type MobileView = "globe" | "zones";
 
 /**
  * Literal union of every navigation label, derived from the
- * `NAVIGATION` array.
- *
- * Deriving the type from the array makes the array the single
- * source of truth: adding a new entry to `NAVIGATION` extends
- * this union automatically, and every consumer that switches
- * on the label is checked by the compiler against the new
- * value. A hand-maintained union would drift.
+ * `NAVIGATION` array so the array stays the single source of
+ * truth.
  */
 type NavigationLabel = (typeof NAVIGATION)[number]["label"];
 
@@ -47,10 +43,8 @@ interface HeaderProps {
 
 /**
  * The three desktop navigation items, in render order.
- *
- * `as const` is load-bearing: it freezes the array to a tuple
- * of literal objects, which is what lets `NavigationLabel` be
- * a literal union of the three strings rather than `string`.
+ * `as const` is load-bearing: it makes `NavigationLabel` a
+ * literal union rather than `string`.
  */
 const NAVIGATION = [
   { label: "Explore", href: "#explore" },
@@ -62,47 +56,109 @@ const NAVIGATION = [
 const EASE = [0.16, 1, 0.3, 1] as const;
 
 /**
- * The section IDs the header observes for scroll-driven
- * active-state tracking.
- *
- * ## Why this is a separate list
- *
- * `NAVIGATION` includes an entry for `"Cities"` because that
- * item is rendered in the desktop nav, but `"Cities"` is not
- * a scroll target — it opens a drawer. Observing it would
- * make the indicator jump to `"Cities"` when the user
- * happened to be scrolled past `#cities`, which is not a
- * section a user scrolls *to* in normal use.
- *
- * The two lists are deliberately different shapes: this one
- * is a list of *observable scroll targets*; `NAVIGATION` is a
- * list of *renderable nav items*. Do not merge them.
+ * Section IDs observed for scroll-driven active-state tracking.
+ * `"Cities"` is deliberately absent: it opens a drawer and is
+ * not a scroll target. Do not merge this with `NAVIGATION`.
  */
 const OBSERVED_SECTION_IDS = ["explore", "time-zones"] as const;
 
 /**
- * Offset applied to the viewport top when measuring section
- * visibility, in pixels.
- *
- * Matches the sticky header's height (`h-[76px]`) so a section
- * whose top is under the header is not treated as the visible
- * start. A section that has scrolled behind the header is
- * effectively "past" from the user's perspective, and this
- * offset makes the intersection observer agree.
+ * Viewport-top offset used when measuring section visibility.
+ * Matches the sticky header height (`h-[76px]`).
  */
 const SCROLL_ROOT_MARGIN = "-76px 0px 0px 0px";
+
+/**
+ * Brand colours.
+ *
+ * The star is a warm gold (a star at dusk). The wordmark
+ * sweeps gold -> rose -> sky on hover, which reads as a day
+ * moving across time zones: sunrise, sunset, night.
+ */
+const STAR_COLOR = "#f6b93b";
+const STAR_GLOW = "246, 185, 59";
+const WORDMARK_SWEEP =
+  "linear-gradient(90deg, #ffd27a 0%, #ff8fb1 50%, #8fb8ff 100%)";
 
 /* -------------------------------------------------------------------------- */
 /* Brand                                                                      */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Four-point glowing star.
+ *
+ * Three layers:
+ *   1. a blurred radial halo that brightens and grows on hover
+ *   2. the star itself, which turns a quarter-turn on hover
+ *   3. a slow idle twinkle (disabled for reduced-motion users)
+ *
+ * Hover state comes from the parent via the `rest` / `hover`
+ * variant labels, so the star and the wordmark react together.
+ */
+function StarMark({ twinkle }: { twinkle: boolean }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="relative flex size-7 items-center justify-center"
+    >
+      <motion.span
+        className="absolute inset-0 rounded-full blur-md"
+        style={{
+          background: `radial-gradient(circle, rgba(${STAR_GLOW},0.6) 0%, rgba(${STAR_GLOW},0) 70%)`,
+        }}
+        variants={{
+          rest: { opacity: 0.55, scale: 1 },
+          hover: { opacity: 1, scale: 1.45 },
+        }}
+        transition={{ duration: 0.5, ease: EASE }}
+      />
+
+      <motion.span
+        className="relative flex items-center justify-center"
+        animate={
+          twinkle
+            ? { opacity: [1, 0.72, 1], scale: [1, 0.92, 1] }
+            : undefined
+        }
+        transition={
+          twinkle
+            ? { duration: 3.2, repeat: Infinity, ease: "easeInOut" }
+            : undefined
+        }
+      >
+        <motion.svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          className="size-[18px]"
+          style={{
+            color: STAR_COLOR,
+            filter: `drop-shadow(0 0 5px rgba(${STAR_GLOW},0.85))`,
+          }}
+          variants={{
+            rest: { rotate: 0, scale: 1 },
+            hover: { rotate: 90, scale: 1.18 },
+          }}
+          transition={{ duration: 0.6, ease: EASE }}
+        >
+          <path
+            fill="currentColor"
+            d="M12 1.5C12.9 7.5 16.5 11.1 22.5 12C16.5 12.9 12.9 16.5 12 22.5C11.1 16.5 7.5 12.9 1.5 12C7.5 11.1 11.1 7.5 12 1.5Z"
+          />
+        </motion.svg>
+      </motion.span>
+    </span>
+  );
+}
+
 function Brand() {
+  const reduceMotion = useReducedMotion();
+
   return (
     <motion.a
       href="/"
       aria-label="World Clock home"
       className="
-        group inline-flex select-none items-center gap-3
+        group inline-flex select-none items-center rounded-md
         focus-visible:outline-none focus-visible:ring-2
         focus-visible:ring-[var(--foreground)]/30
         focus-visible:ring-offset-4
@@ -112,31 +168,49 @@ function Brand() {
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.8, delay: 0.05, ease: EASE }}
     >
-      <span
-        aria-hidden="true"
-        className="relative flex size-2 items-center justify-center"
+      {/* Variant labels flow down to the star and the wordmark. */}
+      <motion.span
+        className="inline-flex items-center gap-2.5"
+        initial="rest"
+        animate="rest"
+        whileHover="hover"
       >
-        <span
-          className="
-            absolute size-2 rounded-full bg-[var(--foreground)]
-            transition-transform duration-300 ease-out
-            group-hover:scale-125
-          "
-        />
+        <StarMark twinkle={!reduceMotion} />
 
-        <span
-          className="
-            absolute size-4 rounded-full border
-            border-[var(--foreground)]/15 opacity-0
-            transition-all duration-500 ease-out
-            group-hover:scale-125 group-hover:opacity-100
-          "
-        />
-      </span>
+        {/*
+         * Two copies of the text stacked on top of each other.
+         * The plain one is what you see normally. On hover the
+         * plain one fades out and the colour one fades in; on
+         * mouse-leave it fades back. Pure CSS, driven by the
+         * `group` class on the link, so it also works on
+         * keyboard focus.
+         */}
+        <span className="relative text-[15px] font-medium tracking-[-0.025em] sm:text-base">
+          <span
+            className="
+              text-[var(--foreground)] transition-opacity duration-500
+              group-hover:opacity-0 group-focus-visible:opacity-0
+            "
+          >
+            World Clock
+          </span>
 
-      <span className="text-[15px] font-medium tracking-[-0.025em] text-[var(--foreground)] sm:text-base">
-        World Clock
-      </span>
+          <span
+            aria-hidden="true"
+            className="
+              absolute inset-0 bg-clip-text text-transparent opacity-0
+              transition-opacity duration-500
+              group-hover:opacity-100 group-focus-visible:opacity-100
+            "
+            style={{
+              backgroundImage: WORDMARK_SWEEP,
+              WebkitBackgroundClip: "text",
+            }}
+          >
+            World Clock
+          </span>
+        </span>
+      </motion.span>
     </motion.a>
   );
 }
@@ -167,7 +241,8 @@ function NavigationItem({
   const sharedClassName = `
     group relative inline-flex items-center py-2
     text-[12px] font-medium tracking-[-0.01em]
-    text-[var(--muted)] transition-colors duration-300
+    transition-colors duration-300
+    ${active ? "text-[var(--foreground)]" : "text-[var(--muted)]"}
     hover:text-[var(--foreground)]
     focus-visible:outline-none focus-visible:ring-2
     focus-visible:ring-[var(--foreground)]/25
@@ -196,10 +271,14 @@ function NavigationItem({
             layoutId="world-clock-nav-indicator"
             className="
               absolute -bottom-1.5 left-1/2 size-1 -translate-x-1/2
-              rounded-full bg-[var(--foreground)]
+              rounded-full
             "
+            style={{
+              backgroundColor: STAR_COLOR,
+              boxShadow: `0 0 8px 1px rgba(${STAR_GLOW},0.8)`,
+            }}
             initial={{ opacity: 0, scale: 0 }}
-            animate={{ opacity: 0.65, scale: 1 }}
+            animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0 }}
             transition={{ duration: 0.25, ease: EASE }}
           />
@@ -232,6 +311,7 @@ function NavigationItem({
     <motion.a
       href={href}
       onClick={onClick}
+      aria-current={active ? "location" : undefined}
       className={sharedClassName}
       {...motionProps}
     >
@@ -310,13 +390,7 @@ function MobileActions({
         backdrop-blur-xl
       "
     >
-      {/*
-       * Two mutually exclusive mode buttons, grouped under a
-       * radiogroup. This is the correct ARIA pattern for
-       * "pick one of N states" — the previous `aria-pressed`
-       * on a plain button is for independent toggles, not a
-       * mode selector.
-       */}
+      {/* Mutually exclusive modes: a radiogroup is the right ARIA pattern. */}
       <div
         role="radiogroup"
         aria-label="Mobile view mode"
@@ -451,59 +525,23 @@ function MobileActionButton({
  * Track which page section is currently active based on
  * scroll position.
  *
- * ## Algorithm
+ * An `IntersectionObserver` keeps a set of candidate sections
+ * in the viewport. On each scroll (throttled via
+ * `requestAnimationFrame`) we pick the candidate whose top
+ * edge is closest to, but not below, the viewport top. If none
+ * is at or above the top, we fall back to the smallest positive
+ * top. If nothing intersects, the active section is unchanged.
  *
- *   1. An `IntersectionObserver` maintains a set of
- *      *candidates* — sections currently in the viewport.
+ * "Closest to viewport top" is preferred over "largest visible
+ * area" because the latter flickers at section boundaries.
  *
- *   2. On every scroll event (throttled through
- *      `requestAnimationFrame`), we pick the candidate whose
- *      top edge is closest to — but not below — the viewport
- *      top. That is the section the user is "in" even when
- *      multiple sections are partially visible.
- *
- *   3. If no candidate has its top at or above the viewport
- *      top — the user is above every observed section —
- *      fall back to the candidate with the smallest positive
- *      top.
- *
- *   4. If nothing is intersecting at all, the active section
- *      is left unchanged rather than cleared.
- *
- * ## Why this tie-break rule
- *
- * The alternative — pick the section with the largest
- * intersecting area — reads naturally on paper but behaves
- * badly at section boundaries. When two sections are each
- * ~50% visible, the "largest area" rule flips the active
- * state at the exact midpoint of the boundary, producing
- * visible flicker as the user scrolls past. The
- * "closest-to-viewport-top" rule prefers the section the user
- * has already scrolled *into*, which is what a fixed
- * navigation indicator is supposed to express. It changes
- * state once per section transition, not once per pixel.
- *
- * ## Disabling on mobile
- *
- * The hook takes an `enabled` flag. On mobile the sections
- * are not stacked — the user toggles between `globe` and
- * `zones` — so scroll position is not meaningful. Passing
- * `false` skips all setup and leaves the internal state at
- * its default.
- *
- * @param enabled  When `false`, the hook does nothing.
+ * @param enabled  When `false`, the hook does nothing (mobile).
  */
 function useScrollActiveSection(
   enabled: boolean,
 ): [NavigationLabel, (label: NavigationLabel) => void] {
   const [active, setActive] = useState<NavigationLabel>("Explore");
 
-  /*
-   * The set of section IDs currently intersecting the
-   * viewport. Held in a ref rather than state because
-   * changing it does not itself need to trigger a render —
-   * it only feeds into the scroll handler.
-   */
   const candidatesRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -535,12 +573,6 @@ function useScrollActiveSection(
       observer.observe(section);
     }
 
-    /*
-     * Pick the candidate with the closest-to-zero top that
-     * is still at or above the viewport top. Recomputed on
-     * a `requestAnimationFrame` so a burst of scroll events
-     * does one layout read.
-     */
     let rafId: number | null = null;
 
     const pickActive = (): void => {
@@ -561,16 +593,7 @@ function useScrollActiveSection(
         }
       }
 
-      /*
-       * No candidate is at or above the viewport top — the
-       * user is above every observed section. Pick the one
-       * with the smallest positive top.
-       *
-       * `bestDistance` is still `Infinity` here because the
-       * loop above only assigns inside a `top <= 0` guard.
-       * Reset it explicitly so the intent is obvious and a
-       * future refactor cannot accidentally leak a value.
-       */
+      /* Above every observed section: take the smallest positive top. */
       if (bestId === null) {
         bestDistance = Infinity;
 
@@ -604,8 +627,7 @@ function useScrollActiveSection(
       passive: true,
     });
 
-    /* Initial pick so a page loaded at a scroll offset is
-       correctly labeled before the first scroll. */
+    /* Initial pick so a page loaded at an offset is labeled correctly. */
     handleScroll();
 
     return () => {
@@ -626,11 +648,6 @@ export default function Header({
   mobileView,
   onMobileViewChange,
 }: HeaderProps) {
-  /*
-   * Detect the desktop breakpoint so scroll tracking and the
-   * mobile view-mode state do not fight each other. On mobile
-   * the scroll hook is disabled entirely.
-   */
   const [isDesktop, setIsDesktop] = useState(false);
 
   useEffect(() => {
@@ -648,24 +665,33 @@ export default function Header({
     };
   }, []);
 
+  /*
+   * Once the page has scrolled, the header gets a visible
+   * border and a more opaque background so content passing
+   * underneath stays legible. At the very top it is nearly
+   * invisible, letting the hero breathe.
+   */
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const update = (): void => {
+      setScrolled(window.scrollY > 8);
+    };
+
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", update);
+    };
+  }, []);
+
   const [scrollActive, setScrollActive] =
     useScrollActiveSection(isDesktop);
 
   /*
-   * Hash-change listener.
-   *
-   * Runs in parallel with the scroll hook. When the user
-   * clicks a nav link, the hash changes immediately and the
-   * browser begins a smooth scroll to the target section. The
-   * scroll animation takes ~500ms. Without this listener the
-   * indicator would stay on the old section until the scroll
-   * settles and the intersection observer catches up — a
-   * visible lag of half a second.
-   *
-   * This listener snaps the indicator to the clicked section
-   * on the next animation frame, before the scroll begins.
-   * When the scroll then updates the observer, it agrees with
-   * what the user already sees.
+   * Snap the indicator to the clicked section immediately,
+   * instead of waiting ~500ms for the smooth scroll to settle.
    */
   useEffect(() => {
     const syncWithHash = (): void => {
@@ -687,14 +713,9 @@ export default function Header({
   }, [setScrollActive]);
 
   /*
-   * The active navigation item.
-   *
-   * On desktop it comes from scroll position; on mobile, from
-   * `mobileView`, since the two primary surfaces are toggled
-   * rather than scrolled. `"Cities"` is never active: it is a
-   * button that opens a drawer, not a scroll target, and
-   * highlighting it would mislead the user into thinking they
-   * had navigated to a section.
+   * Desktop: active item comes from scroll position.
+   * Mobile: from `mobileView`. "Cities" is never active since
+   * it opens a drawer rather than navigating to a section.
    */
   const active: NavigationLabel = isDesktop
     ? scrollActive
@@ -708,10 +729,15 @@ export default function Header({
 
   return (
     <header
-      className="
-        sticky top-0 z-50 w-full border-b border-white/[0.06]
-        bg-[var(--background)]/70 backdrop-blur-xl
-      "
+      className={`
+        sticky top-0 z-50 w-full border-b backdrop-blur-xl
+        transition-[background-color,border-color] duration-500
+        ${
+          scrolled
+            ? "border-[var(--border)] bg-[var(--background)]/85"
+            : "border-transparent bg-[var(--background)]/40"
+        }
+      `}
     >
       <div
         className="

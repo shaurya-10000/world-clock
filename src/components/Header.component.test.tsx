@@ -1,4 +1,9 @@
-import { render, screen, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import {
   afterEach,
   beforeEach,
@@ -9,7 +14,18 @@ import {
 } from "vitest";
 
 import Header from "@/components/Header";
-import { resetEventBus } from "@/lib/events";
+import { emit, resetEventBus } from "@/lib/events";
+
+/*
+ * Replace `emit` with a spy so click tests can assert on it
+ * without needing to know how the event bus delivers events.
+ * Everything else in the module (including `resetEventBus`)
+ * stays real.
+ */
+vi.mock("@/lib/events", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/events")>();
+  return { ...actual, emit: vi.fn() };
+});
 
 /* -------------------------------------------------------------------------- */
 /* matchMedia helper                                                          */
@@ -17,8 +33,8 @@ import { resetEventBus } from "@/lib/events";
 
 /**
  * Install a fake `matchMedia` that reports the desktop
- * breakpoint per `desktop`. Every other media query reports
- * `false`.
+ * breakpoint per `desktop`. Every other media query
+ * (including `prefers-reduced-motion`) reports `false`.
  */
 function installMatchMedia(desktop: boolean): void {
   Object.defineProperty(window, "matchMedia", {
@@ -36,6 +52,14 @@ function installMatchMedia(desktop: boolean): void {
         removeEventListener: () => {},
         dispatchEvent: () => true,
       }) as unknown as MediaQueryList,
+  });
+}
+
+function setScrollY(value: number): void {
+  Object.defineProperty(window, "scrollY", {
+    writable: true,
+    configurable: true,
+    value,
   });
 }
 
@@ -69,12 +93,15 @@ function getMobileCitiesButton(): HTMLElement {
 
 beforeEach(() => {
   resetEventBus();
+  vi.mocked(emit).mockClear();
   installMatchMedia(false);
+  setScrollY(0);
   window.location.hash = "";
 });
 
 afterEach(() => {
   resetEventBus();
+  setScrollY(0);
   vi.restoreAllMocks();
 });
 
@@ -106,6 +133,13 @@ describe("Header — structure", () => {
     ).toBeInTheDocument();
   });
 
+  it("brand link points at the home page", () => {
+    renderHeader();
+    expect(
+      screen.getByRole("link", { name: "World Clock home" }),
+    ).toHaveAttribute("href", "/");
+  });
+
   it("renders the primary navigation landmark", () => {
     renderHeader();
     expect(
@@ -123,6 +157,83 @@ describe("Header — structure", () => {
     expect(screen.getByRole("banner").className).toContain(
       "backdrop-blur",
     );
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Brand                                                                      */
+/* -------------------------------------------------------------------------- */
+
+describe("Header — brand", () => {
+  it("renders the star mark as a decorative svg", () => {
+    renderHeader();
+
+    const brand = screen.getByRole("link", {
+      name: "World Clock home",
+    });
+    const star = brand.querySelector("svg");
+
+    expect(star).not.toBeNull();
+    expect(star).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("shows the wordmark text inside the brand link", () => {
+    renderHeader();
+
+    const brand = screen.getByRole("link", {
+      name: "World Clock home",
+    });
+    expect(brand).toHaveTextContent("World Clock");
+  });
+
+  it("hides the colour copy of the wordmark from assistive tech", () => {
+    renderHeader();
+
+    const brand = screen.getByRole("link", {
+      name: "World Clock home",
+    });
+    const copies = Array.from(
+      brand.querySelectorAll<HTMLElement>("span"),
+    ).filter((el) => el.textContent === "World Clock");
+
+    /* One visible copy, one aria-hidden colour copy. */
+    expect(copies).toHaveLength(2);
+    expect(
+      copies.filter((el) => el.getAttribute("aria-hidden") === "true"),
+    ).toHaveLength(1);
+  });
+
+  it("colour copy is invisible until the link is hovered", () => {
+    renderHeader();
+
+    const brand = screen.getByRole("link", {
+      name: "World Clock home",
+    });
+    const colourCopy = brand.querySelector<HTMLElement>(
+      'span[aria-hidden="true"].bg-clip-text',
+    );
+
+    expect(colourCopy).not.toBeNull();
+    expect(colourCopy!.className).toContain("opacity-0");
+    expect(colourCopy!.className).toContain("group-hover:opacity-100");
+  });
+
+  it("plain copy fades out on hover", () => {
+    renderHeader();
+
+    const brand = screen.getByRole("link", {
+      name: "World Clock home",
+    });
+    const plainCopy = Array.from(
+      brand.querySelectorAll<HTMLElement>("span"),
+    ).find(
+      (el) =>
+        el.textContent === "World Clock" &&
+        el.getAttribute("aria-hidden") !== "true",
+    );
+
+    expect(plainCopy).toBeDefined();
+    expect(plainCopy!.className).toContain("group-hover:opacity-0");
   });
 });
 
@@ -177,6 +288,45 @@ describe("Header — navigation items", () => {
 });
 
 /* -------------------------------------------------------------------------- */
+/* Active state                                                               */
+/* -------------------------------------------------------------------------- */
+
+describe("Header — active state", () => {
+  it("marks Explore as current when mobileView is globe", () => {
+    render(
+      <Header mobileView="globe" onMobileViewChange={vi.fn()} />,
+    );
+
+    expect(
+      screen.getByRole("link", { name: "Explore" }),
+    ).toHaveAttribute("aria-current", "location");
+    expect(
+      screen.getByRole("link", { name: "Time Zones" }),
+    ).not.toHaveAttribute("aria-current");
+  });
+
+  it("marks Time Zones as current when mobileView is zones", () => {
+    render(
+      <Header mobileView="zones" onMobileViewChange={vi.fn()} />,
+    );
+
+    expect(
+      screen.getByRole("link", { name: "Time Zones" }),
+    ).toHaveAttribute("aria-current", "location");
+    expect(
+      screen.getByRole("link", { name: "Explore" }),
+    ).not.toHaveAttribute("aria-current");
+  });
+
+  it("never marks the Cities button as current", () => {
+    renderHeader();
+    expect(getDesktopCitiesButton()).not.toHaveAttribute(
+      "aria-current",
+    );
+  });
+});
+
+/* -------------------------------------------------------------------------- */
 /* Mobile controls                                                            */
 /* -------------------------------------------------------------------------- */
 
@@ -225,6 +375,96 @@ describe("Header — mobile controls", () => {
       screen.getByRole("radio", { name: "Zones" }),
     ).toHaveAttribute("aria-checked", "true");
   });
+
+  it("calls onMobileViewChange with zones when Zones is clicked", () => {
+    const onChange = vi.fn();
+    render(<Header mobileView="globe" onMobileViewChange={onChange} />);
+
+    fireEvent.click(screen.getByRole("radio", { name: "Zones" }));
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledWith("zones");
+  });
+
+  it("calls onMobileViewChange with globe when Globe is clicked", () => {
+    const onChange = vi.fn();
+    render(<Header mobileView="zones" onMobileViewChange={onChange} />);
+
+    fireEvent.click(screen.getByRole("radio", { name: "Globe" }));
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledWith("globe");
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Cities drawer                                                              */
+/* -------------------------------------------------------------------------- */
+
+describe("Header — cities drawer", () => {
+  it("desktop Cities button emits cities:open", () => {
+    renderHeader();
+
+    fireEvent.click(getDesktopCitiesButton());
+
+    expect(emit).toHaveBeenCalledTimes(1);
+    expect(emit).toHaveBeenCalledWith("cities:open", undefined);
+  });
+
+  it("mobile Cities button emits cities:open", () => {
+    renderHeader();
+
+    fireEvent.click(getMobileCitiesButton());
+
+    expect(emit).toHaveBeenCalledTimes(1);
+    expect(emit).toHaveBeenCalledWith("cities:open", undefined);
+  });
+
+  it("clicking a section link does not open the drawer", () => {
+    renderHeader();
+
+    fireEvent.click(screen.getByRole("link", { name: "Explore" }));
+
+    expect(emit).not.toHaveBeenCalled();
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Scroll state                                                               */
+/* -------------------------------------------------------------------------- */
+
+describe("Header — scroll state", () => {
+  it("is transparent-bordered at the top of the page", () => {
+    renderHeader();
+
+    const header = screen.getByRole("banner");
+    expect(header.className).toContain("border-transparent");
+    expect(header.className).not.toContain("border-[var(--border)]");
+  });
+
+  it("gets a visible border after scrolling", () => {
+    renderHeader();
+
+    setScrollY(120);
+    fireEvent.scroll(window);
+
+    const header = screen.getByRole("banner");
+    expect(header.className).toContain("border-[var(--border)]");
+    expect(header.className).not.toContain("border-transparent");
+  });
+
+  it("returns to transparent when scrolled back to the top", () => {
+    renderHeader();
+
+    setScrollY(120);
+    fireEvent.scroll(window);
+    setScrollY(0);
+    fireEvent.scroll(window);
+
+    expect(screen.getByRole("banner").className).toContain(
+      "border-transparent",
+    );
+  });
 });
 
 /* -------------------------------------------------------------------------- */
@@ -270,6 +510,8 @@ describe("Header — accessibility", () => {
     renderHeader();
 
     const svgs = document.querySelectorAll("svg");
+    expect(svgs.length).toBeGreaterThan(0);
+
     for (const svg of svgs) {
       expect(svg.getAttribute("aria-hidden")).toBe("true");
     }
