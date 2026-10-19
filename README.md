@@ -13,7 +13,7 @@ Rotate the planet, search 180+ cities, and time-travel to the next solstice, an 
 
 [**Live demo**](https://world-clock-gray.vercel.app) · [**Watch the demo**](<DEMO_VIDEO_URL>) · [**Test results**](#test-results) · [**Lighthouse**](#lighthouse) · [**Report a bug**](https://github.com/shaurya-10000/world-clock/issues)
 
-![World Clock hero](docs/images/hero.png)
+<img src="docs/images/hero.png" alt="World Clock hero" width="100%" />
 
 </div>
 
@@ -59,14 +59,33 @@ Rotate the planet, search 180+ cities, and time-travel to the next solstice, an 
 
 <sub>Measured on 15 October 2026. Lighthouse figures are single runs against the production deployment.</sub>
 
-<table>
+<table width="100%">
   <tr>
-    <td align="center" width="50%"><img src="docs/images/globe.png" alt="Interactive 3D globe" /><br /><sub><b>Interactive 3D globe</b></sub></td>
-    <td align="center" width="50%"><img src="docs/images/clock.png" alt="Analog and digital clock faces" /><br /><sub><b>Analog and digital clocks</b></sub></td>
+    <td align="center"><img src="docs/images/globe.png" alt="Interactive 3D globe" width="100%" /><br /><sub><b>Interactive 3D globe</b></sub></td>
+  </tr>
+</table>
+
+<table width="100%">
+  <tr>
+    <td align="center"><img src="docs/images/analog-dawn.png" alt="Analog clock in the dawn sky" width="100%" /><br /><sub><b>Analog · Dawn</b></sub></td>
   </tr>
   <tr>
-    <td align="center" width="50%"><img src="docs/images/cities.png" alt="Cities drawer with live times" /><br /><sub><b>Cities drawer with live times</b></sub></td>
-    <td align="center" width="50%"><img src="docs/images/events.png" alt="Astronomical event picker" /><br /><sub><b>Astronomical event picker</b></sub></td>
+    <td align="center"><img src="docs/images/digital-day.png" alt="Digital clock in the daytime sky" width="100%" /><br /><sub><b>Digital · Day</b></sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/digital-dusk.png" alt="Digital clock in the dusk sky" width="100%" /><br /><sub><b>Digital · Dusk</b></sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/analog-night.png" alt="Analog clock in the night sky" width="100%" /><br /><sub><b>Analog · Night</b></sub></td>
+  </tr>
+</table>
+
+<table width="100%">
+  <tr>
+    <td align="center"><img src="docs/images/cities.png" alt="Cities drawer with live times" width="100%" /><br /><sub><b>Cities drawer with live times</b></sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/events.png" alt="Astronomical event picker" width="100%" /><br /><sub><b>Astronomical event picker</b></sub></td>
   </tr>
 </table>
 
@@ -294,10 +313,12 @@ Latest full run, Vitest 5.0.0, 15 October 2026:
 | Tests | **2,804 passed** (2,804) |
 | Duration | **29.04 s** for the full suite |
 
-<table>
+<table width="100%">
   <tr>
-    <td align="center" width="50%"><img src="docs/images/vitest.png" alt="Vitest run: 130 test files and 2,804 tests passing in 29.04 seconds" /><br /><sub><b>npm run test:run</b></sub></td>
-    <td align="center" width="50%"><img src="docs/images/coverage.png" alt="Coverage report summary by folder: 88.79% statements, 80.26% branches, 90.14% functions, 89.79% lines" /><br /><sub><b>npm run test:coverage</b></sub></td>
+    <td align="center"><img src="docs/images/vitest.png" alt="Vitest run: 130 test files and 2,804 tests passing in 29.04 seconds" width="100%" /><br /><sub><b>npm run test:run</b></sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/coverage.png" alt="Coverage report summary by folder: 88.79% statements, 80.26% branches, 90.14% functions, 89.79% lines" width="100%" /><br /><sub><b>npm run test:coverage</b></sub></td>
   </tr>
 </table>
 
@@ -403,10 +424,12 @@ Audited on the production deployment at [world-clock-gray.vercel.app](https://wo
 
 Agentic Browsing is one of Lighthouse's newer categories. It reports passed audits out of the total checked, not a 0 to 100 score.
 
-<table>
+<table width="100%">
   <tr>
-    <td align="center" width="50%"><img src="docs/images/lighthouse-desktop.png" alt="Lighthouse scores on desktop, including Agentic Browsing" /><br /><sub><b>Desktop</b></sub></td>
-    <td align="center" width="50%"><img src="docs/images/lighthouse-mobile.png" alt="Lighthouse scores on mobile, including Agentic Browsing" /><br /><sub><b>Mobile</b></sub></td>
+    <td align="center"><img src="docs/images/lighthouse-desktop.png" alt="Lighthouse scores on desktop, including Agentic Browsing" width="100%" /><br /><sub><b>Desktop</b></sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/lighthouse-mobile.png" alt="Lighthouse scores on mobile, including Agentic Browsing" width="100%" /><br /><sub><b>Mobile</b></sub></td>
   </tr>
 </table>
 
